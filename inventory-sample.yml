@@ -7,3 +7,5 @@ znuny:
       domain: znuny.example.org
       user: znuny
       password: testpassw0rd_changeme
+
+      znuny_release: 6.3.3
