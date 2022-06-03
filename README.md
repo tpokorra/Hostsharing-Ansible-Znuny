@@ -31,6 +31,10 @@ The option -i can be used to read this inventory file instead of the /etc/ansibl
 
     $ ansible-playbook -i inventory.yml playbook-install.yml
 
+Then you have to run the installer manually:
+
+    https://znuny.example.org/cgi-bin/installer.pl
+
 Now we can reach our site via:
 
     https://znuny.example.org

@@ -76,8 +76,53 @@
   ########################
   ## setup the apache site
   ########################
+  - name: Check for cgi-ssl directory
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    stat:
+      path: "/home/pacs/{{pac}}/users/{{user}}/doms/{{domain}}/cgi-ssl"
+    register: cgissl
+  - name: drop cgi-ssl
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    file:
+       path: "/home/pacs/{{pac}}/users/{{user}}/doms/{{domain}}/cgi-ssl"
+       state: absent
+    when: cgissl.stat.exists and cgissl.stat.isdir
+  - name: create symbolic link for cgi-ssl
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    file:
+      src: "/home/pacs/{{pac}}/users/{{user}}/znuny/bin/cgi-bin"
+      dest: "/home/pacs/{{pac}}/users/{{user}}/doms/{{domain}}/cgi-ssl"
+      state: link
 
-  # TODO
+  - name: upload htaccess rewrite rule
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    template: dest="/home/pacs/{{pac}}/users/{{user}}/doms/{{domain}}/htdocs-ssl/.htaccess" src="templates/htaccess" mode=0444
+
+  - name: create symbolic link for otrs-web
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    file:
+      src: "/home/pacs/{{pac}}/users/{{user}}/znuny/var/httpd/htdocs"
+      dest: "/home/pacs/{{pac}}/users/{{user}}/doms/{{domain}}/htdocs-ssl/otrs-web"
+      state: link
+
+  - name: change read permissions for apache
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    shell: |
+      chmod a+r -R htdocs || exit -1
+      # TODO this does not apply yet to cache files that are created after this call!
+      #find htdocs -type d -exec chmod o+x {} + || exit -1
+      find htdocs -type d -exec chmod g+s {} + || exit -1
+      touch /home/pacs/{{pac}}/users/{{user}}/.ansible_read_permission
+    args:
+      executable: /bin/bash
+      chdir: "/home/pacs/{{pac}}/users/{{user}}/znuny/var/httpd"
+      creates: "/home/pacs/{{pac}}/users/{{user}}/.ansible_read_permission"
 
   ####################################
   ## install cron jobs
@@ -88,4 +133,4 @@
     cron:
       name: "znuny cronjob"
       minute: "*/5"
-      job: "cd /home/pacs/{{pac}}/users/{{user}}/znuny && ./bin/Cron.sh"
+      job: "/home/pacs/{{pac}}/users/{{user}}/znuny/bin/otrs.Daemon.pl start >> /dev/null"
