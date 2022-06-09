@@ -1,0 +1,59 @@
+--- bin/otrs.SetPermissions.pl.orig	2022-04-28 15:56:09.000000000 +0200
++++ bin/otrs.SetPermissions.pl	2022-06-09 12:13:17.450754347 +0200
+@@ -31,6 +31,7 @@
+ use Getopt::Long();
+ 
+ my $OTRSDirectory       = dirname($RealBin);
++$OTRSDirectory          = "${OTRSDirectory}/var/httpd/htdocs";
+ my $OTRSDirectoryLength = length($OTRSDirectory);
+ 
+ my $OtrsUser = 'otrs';    # default: otrs
+@@ -115,10 +116,10 @@
+         exit 0;
+     }
+ 
+-    if ( $> != 0 ) {    # $EFFECTIVE_USER_ID
+-        print STDERR "ERROR: Please run this script as superuser (root).\n";
+-        exit 1;
+-    }
++    #if ( $> != 0 ) {    # $EFFECTIVE_USER_ID
++    #    print STDERR "ERROR: Please run this script as superuser (root).\n";
++    #    exit 1;
++    #}
+ 
+     # check params
+     $OtrsUserID = getpwnam $OtrsUser;
+@@ -190,20 +191,20 @@
+     my ( $File, $RelativeFile ) = @_;
+ 
+     ## no critic (ProhibitLeadingZeros)
+-    # Writable by default, owner OTRS and group webserver.
+-    my ( $TargetPermission, $TargetUserID, $TargetGroupID ) = ( 0660, $OtrsUserID, $WebGroupID );
++    # Writable by default, owner OTRS and group webserver. Readable by other
++    my ( $TargetPermission, $TargetUserID, $TargetGroupID ) = ( 0666, $OtrsUserID, $WebGroupID );
+     if ( -d $File ) {
+ 
+         # SETGID for all directories so that both OTRS and the web server can write to the files.
+         # Other users should be able to read and cd to the directories.
+-        $TargetPermission = 02775;
++        $TargetPermission = 02777;
+     }
+     else {
+         # Executable bit for script files.
+         EXEXUTABLE_REGEX:
+         for my $ExecutableRegex (@ExecutableFiles) {
+             if ( $RelativeFile =~ $ExecutableRegex ) {
+-                $TargetPermission = 0770;
++                $TargetPermission = 0777;
+                 last EXEXUTABLE_REGEX;
+             }
+         }
+@@ -212,7 +213,7 @@
+         PROTECTED_REGEX:
+         for my $ProtectedRegex (@ProtectedFiles) {
+             if ( $RelativeFile =~ $ProtectedRegex ) {
+-                $TargetPermission = -d $File ? 0750 : 0640;
++                $TargetPermission = -d $File ? 0755 : 0644;
+                 $TargetGroupID    = $AdminGroupID;
+                 last PROTECTED_REGEX;
+             }

@@ -66,12 +66,69 @@
     become: yes
     become_user: "{{pac}}-{{user}}"
     template: dest="/home/pacs/{{pac}}/users/{{user}}/znuny/Kernel/Config.pm" src="templates/Config.pm" mode=0600
+  - name: upload pgpass file
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    template: dest="/home/pacs/{{pac}}/users/{{user}}/.pgpass" src="templates/pgpass" mode=0600
+
+  #######################
+  ## set file permissions
+  #######################
+  - name: upload SetPermissions patch
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    template: dest="/home/pacs/{{pac}}/users/{{user}}/SetPermissions.patch" src="templates/SetPermissions.patch" mode=0600
+
+  - name: patch SetPermissions
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    shell: |
+      patch -p1 < /home/pacs/{{pac}}/users/{{user}}//SetPermissions.patch || exit -1
+      touch /home/pacs/{{pac}}/users/{{user}}/.ansible_SetPermissions_patched
+    args:
+      executable: /bin/bash
+      chdir: "/home/pacs/{{pac}}/users/{{user}}/znuny/bin"
+      creates: "/home/pacs/{{pac}}/users/{{user}}/.ansible_SetPermissions_patched"
+
+  - name: run SetPermissions
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    shell: |
+      ./bin/otrs.SetPermissions.pl --otrs-user="{{pac}}-{{user}}" --web-group="{{pac}}" --admin-group="{{pac}}" || exit -1
+      touch /home/pacs/{{pac}}/users/{{user}}/.ansible_SetPermissions_run
+    args:
+      executable: /bin/bash
+      chdir: "/home/pacs/{{pac}}/users/{{user}}/znuny"
+      creates: "/home/pacs/{{pac}}/users/{{user}}/.ansible_SetPermissions_run"
 
   ######################
   ## initialise instance
   ######################
+  - name: initialise the database
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    shell: |
+      psql --user {{pac}}_{{user}} < scripts/database/otrs-schema.postgresql.sql || exit -1
+      psql --user {{pac}}_{{user}} < scripts/database/otrs-initial_insert.postgresql.sql || exit -1
+      psql --user {{pac}}_{{user}} < scripts/database/otrs-schema-post.postgresql.sql || exit -1
+      ./bin/otrs.Console.pl Maint::Database::Check || exit -1
+      touch /home/pacs/{{pac}}/users/{{user}}/.ansible_db_init
+    args:
+      executable: /bin/bash
+      chdir: "/home/pacs/{{pac}}/users/{{user}}/znuny"
+      creates: "/home/pacs/{{pac}}/users/{{user}}/.ansible_db_init"
 
-  # TODO
+  - name: initialise the instance
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    shell: |
+      ./bin/otrs.Console.pl Maint::Config::Rebuild || exit -1
+      ./bin/otrs.Console.pl Admin::User::SetPassword 'root@localhost' {{AdminPasswd}} || exit -1
+      touch /home/pacs/{{pac}}/users/{{user}}/.ansible_instance_init
+    args:
+      executable: /bin/bash
+      chdir: "/home/pacs/{{pac}}/users/{{user}}/znuny"
+      creates: "/home/pacs/{{pac}}/users/{{user}}/.ansible_instance_init"
 
   ########################
   ## setup the apache site
@@ -110,20 +167,6 @@
       dest: "/home/pacs/{{pac}}/users/{{user}}/doms/{{domain}}/htdocs-ssl/otrs-web"
       state: link
 
-  - name: change read permissions for apache
-    become: yes
-    become_user: "{{pac}}-{{user}}"
-    shell: |
-      chmod a+r -R htdocs || exit -1
-      # TODO this does not apply yet to cache files that are created after this call!
-      #find htdocs -type d -exec chmod o+x {} + || exit -1
-      find htdocs -type d -exec chmod g+s {} + || exit -1
-      touch /home/pacs/{{pac}}/users/{{user}}/.ansible_read_permission
-    args:
-      executable: /bin/bash
-      chdir: "/home/pacs/{{pac}}/users/{{user}}/znuny/var/httpd"
-      creates: "/home/pacs/{{pac}}/users/{{user}}/.ansible_read_permission"
-
   ####################################
   ## install cron jobs
   ####################################
@@ -134,3 +177,18 @@
       name: "znuny cronjob"
       minute: "*/5"
       job: "/home/pacs/{{pac}}/users/{{user}}/znuny/bin/otrs.Daemon.pl start >> /dev/null"
+
+  ####################################
+  ## fix permissions
+  ####################################
+  - name: fix file permissions
+    become: yes
+    become_user: "{{pac}}-{{user}}"
+    shell: |
+      # get the website once, so that the files in znuny/var/httpd/htdocs will be generated
+      curl https://{{domain}} > /dev/null || exit -1
+      # now set the permissions again
+      ./bin/otrs.SetPermissions.pl --otrs-user="{{pac}}-{{user}}" --web-group="{{pac}}" --admin-group="{{pac}}" || exit -1
+    args:
+      executable: /bin/bash
+      chdir: "/home/pacs/{{pac}}/users/{{user}}/znuny"

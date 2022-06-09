@@ -8,4 +8,8 @@ znuny:
       user: znuny
       password: testpassw0rd_changeme
 
+      # AdminEmail cannot be changed
+      AdminEmail: root@localhost
+      AdminPasswd: topsecret
+
       znuny_release: 6.3.3
