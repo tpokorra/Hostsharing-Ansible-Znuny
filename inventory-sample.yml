@@ -12,4 +12,5 @@ znuny:
       AdminEmail: root@localhost
       AdminPasswd: topsecret
 
-      znuny_release: 6.3.3
+      # see https://www.znuny.org/de/releases
+      znuny_release: 6.0.44
