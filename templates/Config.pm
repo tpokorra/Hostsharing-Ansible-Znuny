@@ -25,6 +25,12 @@ use utf8;
 sub Load {
     my $Self = shift;
 
+    # Damit OTRS die Cache-Files mit den für HS richtigen
+    # Permissions setzt
+    umask 0022;
+
+    $Self->{SecureMode} = 1;
+
     # ---------------------------------------------------- #
     # database settings                                    #
     # ---------------------------------------------------- #
